@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-03-12T04:59:38.830912",
+  "total_records": 50,
+  "total_columns": 6,
+  "columns": [
+    "id",
+    "timestamp",
+    "value",
+    "category",
+    "description",
+    "_hash"
+  ],
+  "file_size_bytes": 6355
+}

@@ -1,116 +1,110 @@
 """
-Project Nova - Main Pipeline Orchestrator
+PROJECT NOVA - MAIN ENTRY POINT
 
-Entry point for the complete data processing pipeline.
-Executes phases sequentially with proper error handling and logging.
+Main execution script for the Project Nova data processing pipeline.
+Orchestrates all phases: data ingestion, validation, hashing, and deduplication.
+
+Usage:
+    python main.py
 """
 
-import os
 import sys
-import json
-import argparse
 import logging
-from datetime import datetime
 from pathlib import Path
 
-def setup_logging(log_dir=None):
-    """Set up root logging configuration."""
-    if log_dir is None:
-        log_dir = os.path.join(os.path.dirname(__file__), 'logs')
-    
-    os.makedirs(log_dir, exist_ok=True)
-    
-    log_file = os.path.join(log_dir, f'pipeline_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
-    
+# Add project root to path for imports
+PROJECT_ROOT = Path(__file__).parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from phases.phase4_execution import run_pipeline, PipelineConfig
+
+
+def configure_logging() -> logging.Logger:
+    """Configure logging for main execution."""
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_file),
-            logging.StreamHandler()
-        ]
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
     return logging.getLogger(__name__)
 
-def run_phase1(project_root, logger):
-    """Execute Phase 1: Data Ingestion and Validation."""
-    logger.info("=" * 70)
-    logger.info("EXECUTING: PHASE 1 - DATA INGESTION AND VALIDATION")
-    logger.info("=" * 70)
+
+def main() -> int:
+    """
+    Main entry point for Project Nova pipeline execution.
+    
+    Returns:
+        int: Exit code (0 = success, 1 = failure)
+    """
+    logger = configure_logging()
     
     try:
-        from phases.phase1_ingestion import ingest_and_validate, save_pipeline_context
+        logger.info("=" * 80)
+        logger.info("PROJECT NOVA - MAIN PIPELINE EXECUTION")
+        logger.info("=" * 80)
         
-        context = ingest_and_validate(
-            raw_dir=os.path.join(project_root, 'data', 'raw'),
-            clean_dir=os.path.join(project_root, 'data', 'clean'),
-            anomalies_dir=os.path.join(project_root, 'data', 'anomalies'),
-            schema_path=os.path.join(project_root, 'config', 'schema.json'),
-            log_dir=os.path.join(project_root, 'logs')
-        )
+        # Initialize pipeline configuration with project root
+        config = PipelineConfig(project_root=str(PROJECT_ROOT))
         
-        context_file = os.path.join(project_root, 'data', 'vault', 'phase1_context.json')
-        save_pipeline_context(context, context_file)
+        logger.info(f"Configuration:")
+        logger.info(f"  Project root: {config.project_root}")
+        logger.info(f"  Raw data directory: {config.raw_dir}")
+        logger.info(f"  Schema path: {config.schema_path}")
+        logger.info(f"  Output directory: {config.output_dir}")
+        logger.info("")
         
-        return context
+        # Run the pipeline
+        logger.info("Starting pipeline execution...")
+        result = run_pipeline(config)
         
+        # Report results
+        logger.info("")
+        logger.info("=" * 80)
+        logger.info("PIPELINE EXECUTION COMPLETE")
+        logger.info("=" * 80)
+        
+        if result['status'] == 'completed_success':
+            logger.info("✓ Pipeline executed successfully!")
+            logger.info("")
+            logger.info("Output Summary:")
+            
+            phases = result.get('phases', {})
+            if 'phase1_data' in phases:
+                phase1 = phases['phase1_data']
+                logger.info(f"  Phase 1 - Records loaded: {phase1.get('total_records', 0)}")
+                logger.info(f"  Phase 1 - Valid records: {phase1.get('valid_records', 0)}")
+            
+            if 'phase2_data' in phases:
+                phase2 = phases['phase2_data']
+                logger.info(f"  Phase 2 - Hashes generated: {phase2.get('hash_count', 0)}")
+            
+            if 'phase3_data' in phases:
+                phase3 = phases['phase3_data']
+                logger.info(f"  Phase 3 - Final records: {phase3.get('final_count', 0)}")
+            
+            output_files = result.get('output_files', {})
+            if output_files:
+                logger.info("")
+                logger.info("Output Files:")
+                for filename, filepath in output_files.items():
+                    logger.info(f"  - {filepath}")
+            
+            logger.info("")
+            logger.info("=" * 80)
+            return 0
+        else:
+            logger.error(f"✗ Pipeline execution failed with status: {result['status']}")
+            if 'errors' in result:
+                logger.error("Errors encountered:")
+                for phase, errors in result['errors'].items():
+                    for error in errors:
+                        logger.error(f"  [{phase}] {error}")
+            return 1
+            
     except Exception as e:
-        logger.error(f"Phase 1 failed: {str(e)}", exc_info=True)
-        return {'status': 'failed', 'error': str(e)}
+        logger.exception(f"Unexpected error during pipeline execution: {e}")
+        return 1
 
-def main():
-    """Main pipeline orchestrator."""
-    parser = argparse.ArgumentParser(description='Project Nova Pipeline Orchestrator')
-    parser.add_argument(
-        '--phase',
-        type=int,
-        choices=[1, 2, 3, 4],
-        default=1,
-        help='Starting phase (1-4)'
-    )
-    parser.add_argument(
-        '--test',
-        action='store_true',
-        help='Run test pipeline with generated sample data'
-    )
-    
-    args = parser.parse_args()
-    
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, project_root)
-    
-    logger = setup_logging(os.path.join(project_root, 'logs'))
-    
-    logger.info("PROJECT NOVA - PIPELINE ORCHESTRATOR")
-    logger.info(f"Project Root: {project_root}")
-    logger.info(f"Starting from Phase: {args.phase}")
-    if args.test:
-        logger.info("Running in TEST mode (generating sample data)")
-    
-    # Generate test data if requested
-    if args.test:
-        logger.info("\nGenerating sample test data...")
-        try:
-            from utils.generate_sample_data import generate_sample_data
-            generate_sample_data()
-            logger.info("Sample data generated successfully")
-        except Exception as e:
-            logger.error(f"Failed to generate sample data: {str(e)}")
-            return 1
-    
-    # Execute Phase 1
-    if args.phase <= 1:
-        context = run_phase1(project_root, logger)
-        if context.get('status') != 'completed_success':
-            logger.error("Phase 1 did not complete successfully")
-            return 1
-    
-    logger.info("\n" + "=" * 70)
-    logger.info("PIPELINE ORCHESTRATOR COMPLETED")
-    logger.info("=" * 70)
-    
-    return 0
 
-if __name__ == '__main__':
-    sys.exit(main())
+if __name__ == "__main__":
+    exit_code = main()
+    sys.exit(exit_code)
