@@ -1,0 +1,42 @@
+{
+  "columns": {
+    "id": {
+      "type": "int",
+      "required": true,
+      "unique": true,
+      "description": "Unique identifier for each record"
+    },
+    "timestamp": {
+      "type": "datetime",
+      "required": true,
+      "description": "Timestamp of the data point"
+    },
+    "value": {
+      "type": "float",
+      "required": true,
+      "description": "Numerical value of the measurement"
+    },
+    "category": {
+      "type": "str",
+      "required": true,
+      "description": "Category or classification of the record"
+    },
+    "description": {
+      "type": "str",
+      "required": false,
+      "description": "Optional text description"
+    }
+  },
+  "row_checks": {
+    "value_range": {
+      "min": 0,
+      "max": 1000,
+      "description": "Valid range for the value field"
+    }
+  },
+  "metadata": {
+    "version": "1.0",
+    "created": "2026-03-10",
+    "description": "Default schema for Phase 1 data ingestion"
+  }
+}

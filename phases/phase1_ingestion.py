@@ -399,7 +399,12 @@ def ingest_and_validate(
         if len(anomalous_df) > 0:
             # Add error reasons column for anomalies
             anomalous_df = anomalous_df.copy()
-            anomalous_df['_anomaly_reasons'] = anomaly_reasons[~clean_mask.values]
+            # Get indices where clean_mask is False
+            anomalous_indices = clean_mask[~clean_mask].index
+            # Map these indices to positions in the anomaly_reasons list
+            anomalous_df['_anomaly_reasons'] = [
+                str(anomaly_reasons[i]) for i in anomalous_indices
+            ]
             anomalous_df.to_csv(anomalies_output, index=False)
             logger.info(f"  - Saved anomalies to {anomalies_output}")
         
