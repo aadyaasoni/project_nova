@@ -27,6 +27,8 @@ def _normalize_value(value: Any) -> Any:
             return None
     except Exception:
         pass
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
     if isinstance(value, (datetime, pd.Timestamp)):
         return value.isoformat()
     if hasattr(value, "item"):

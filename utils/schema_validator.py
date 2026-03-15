@@ -192,3 +192,25 @@ def get_validation_summary(df: pd.DataFrame, schema: Dict[str, Any]) -> Dict[str
         "error_categories": error_categories,
         "is_valid": is_valid,
     }
+
+
+class SchemaViolationError(Exception):
+    pass
+
+
+BASELINES = {}
+
+def validate_schema(source_name: str, df, schema=None):
+    incoming = set(df.columns)
+    if source_name not in BASELINES:
+        BASELINES[source_name] = incoming
+        return {"is_valid": True}
+    expected = BASELINES[source_name]
+    is_valid = incoming == expected
+    return {"is_valid": is_valid}
+
+
+def halt_on_drift(schema_result: Dict[str, Any]):
+    """Raise exception if schema drift detected."""
+    if not schema_result["is_valid"]:
+        raise SchemaViolationError("Schema drift detected")
